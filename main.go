@@ -39,6 +39,7 @@ func createShortUrl(ogUrl string) string {
 }
 func getFullUrl(id string) (UrlData, error) {
 	url, ok := urlData[id]
+	// fmt.Println(urlData)
 	if !ok {
 		return UrlData{}, errors.New("URL not found")
 	}
@@ -54,14 +55,38 @@ func shortUrlHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	err := json.NewDecoder(r.Body).Decode(&request)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	shortUrl := createShortUrl(request.Url)
+	// fmt.Fprintf(w, shortUrl)
+	response := struct {
+		ShortUrl string `json:"shortUrl"`
+	}{ShortUrl: shortUrl}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Path[len("/redirect/"):]
+	url, err := getFullUrl(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	http.Redirect(w, r, url.OgUrl, http.StatusFound)
 }
 
 func main() {
 	fmt.Println("Hello, World!")
-	shortUrl := createShortUrl("https://www.google.com")
-	fmt.Println(shortUrl)
+	// shortUrl := createShortUrl("https://www.google.com")
+	// fmt.Println(shortUrl)
 
 	http.HandleFunc("/", rootHandler)
+	http.HandleFunc("/shorten", shortUrlHandler)
+	http.HandleFunc("/redirect/{id}", redirectHandler)
 	// startign the server
 	fmt.Println("Server is running on port 3000")
 	err := http.ListenAndServe(":3000", nil)
